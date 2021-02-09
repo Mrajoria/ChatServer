@@ -17,6 +17,12 @@ import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import javax.swing.JFrame;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.net.DatagramPacket;
 
 
 public class chatWindow extends JFrame {
@@ -32,15 +38,25 @@ private String name;
 private String adrs;
 private int port;
 private DefaultCaret caret;
-
+private DatagramSocket socket;
+private InetAddress ip;
+private Thread sendt;
 
 chatWindow(String name, String adrs, int port){
 this.name = name;	
 this.adrs = adrs;	
 this.port = port;
 
+boolean connect = OpenConnection(adrs);
+if(!connect) {
+	System.err.println("Conection failed");
+	console("connection failed");
+}
+
 Showtextwindow();
-console("connection established with "+adrs+" at port: "+port+", User: "+name);
+console("Attempting connection with "+adrs+" at port: "+port+", User: "+name);
+String connection = name+" connected from "+adrs+" @ port: "+port;
+send(connection.getBytes());
 }
 
 public void Showtextwindow() {
@@ -148,8 +164,54 @@ public void send(String message) {
 	message = this.name+": "+message;
 	area.append(message+"\n\r");
 	area.setCaretPosition(area.getDocument().getLength());
+	send(message.getBytes());
 	textmessage.setText("");
 }
+
+private boolean OpenConnection(String address) {
+	
+	try {
+		socket = new DatagramSocket();
+		ip = InetAddress.getByName(address);
+	} catch (SocketException e) {
+		e.printStackTrace();
+		return false;
+	} catch (UnknownHostException e) {
+		e.printStackTrace();
+		return false;
+	}
+	return true;
+}
+
+private String receive() {
+	byte[] data = new byte[1024];
+	DatagramPacket packet = new DatagramPacket(data, data.length);
+	
+	try {
+		socket.receive(packet);
+	} catch (IOException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
+	String message = new String(packet.getData());
+	return message;
+}
+
+private void send(byte[] data) {
+	sendt = new Thread("send") {
+		public void run() {
+			DatagramPacket packet = new DatagramPacket(data, data.length,ip, port);
+			try {
+			socket.send(packet);
+			}
+			catch(IOException e) {
+				e.printStackTrace();
+			}
+		}
+	};
+	sendt.start();
+}
+
 
 public void console(String message) {
 	area.append(message+"\n\r");
