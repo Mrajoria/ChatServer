@@ -1,12 +1,17 @@
 package server_cli;
+
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.DatagramPacket;
+import java.util.ArrayList;
+import java.util.List;
+
 public class Server implements Runnable {
 	
 	private int port;
 	private DatagramSocket socket;
 	private Thread runServer,manage,recieve,send;
+	private List<ServerClient> clients = new ArrayList<ServerClient>();
 	private boolean running = false;
 	
 	public Server(int port) {
@@ -25,6 +30,7 @@ public class Server implements Runnable {
 	@Override
 	public void run() {
 	running = true;
+	System.out.println("Server listening on port: "+port);
 	manageClients();
 	recieve();
 	}
@@ -56,13 +62,32 @@ public class Server implements Runnable {
 						e.printStackTrace();
 					}
 					String string = new String(packet.getData());
-					System.out.println(string);
-					
+					process(packet);
+			     //	clients.add( new ServerClient("localman", packet.getAddress(),packet.getPort(), 50));
+			    // 	System.out.println(clients.get(0).address+" "+clients.get(0).port);
+			   //  	System.out.println(string);
 				}
 			}
 		}; recieve.start();
 		
 	}
+	
+	private void process(DatagramPacket packet) {
+		String string  = new  String(packet.getData());
+		if(string.startsWith("/c/")) {
+			int id = UniqueIdentifier.getIdentifier();
+	     	System.out.println("identifier "+id);
+        	clients.add(new ServerClient(string.substring(3,string.length()), packet.getAddress(), packet.getPort(), id));
+			System.out.println(string.substring(3, string.length()));
+	     	System.out.println(clients.get(0).address+" "+clients.get(0).port);
+
+		}
+		else
+			System.out.println(string);
+		
+		
+	}
+	
 	
 	private void send() {
 		

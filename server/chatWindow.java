@@ -41,6 +41,8 @@ private DefaultCaret caret;
 private DatagramSocket socket;
 private InetAddress ip;
 private Thread sendt;
+private int count = 0;
+
 
 chatWindow(String name, String adrs, int port){
 this.name = name;	
@@ -55,7 +57,8 @@ if(!connect) {
 
 Showtextwindow();
 console("Attempting connection with "+adrs+" at port: "+port+", User: "+name);
-String connection = name+" connected from "+adrs+" @ port: "+port;
+count++;
+String connection = "/c/"+name;
 send(connection.getBytes());
 }
 
