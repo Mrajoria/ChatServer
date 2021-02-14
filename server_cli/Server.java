@@ -2,6 +2,7 @@ package server_cli;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.DatagramPacket;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +53,7 @@ public class Server implements Runnable {
 		recieve = new Thread("recieve") {
 			public void run() {
 				while(running) {
+					System.out.println("TOTAL CONNECTED CLIENTS "+clients.size());
 					// Recieve data;
 					byte[] data = new byte[1024];
 					DatagramPacket packet = new DatagramPacket(data, data.length);
@@ -72,6 +74,36 @@ public class Server implements Runnable {
 		
 	}
 	
+	private void sendToAll(String message) {
+		
+		for(int i=0;i< clients.size();i++) {
+			ServerClient client = clients.get(i);
+			send(message.getBytes(), client.address, client.port);
+			System.out.println("sending to client "+client.name);
+		}
+	}
+	
+	private void send(String message, InetAddress address, int port) {
+		 message = message+"/e/";
+		 send(message.getBytes(), address, port);
+	}
+	
+	private void send(byte[] data, InetAddress adress,  int port) {
+		send = new Thread("send") {
+			public void run() {
+				DatagramPacket packet = new DatagramPacket(data, data.length,adress, port);
+				try {
+				socket.send(packet);
+				}
+				catch(IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}; send.start();
+		
+	}
+		
+	
 	private void process(DatagramPacket packet) {
 		String string  = new  String(packet.getData());
 		if(string.startsWith("/c/")) {
@@ -80,17 +112,49 @@ public class Server implements Runnable {
         	clients.add(new ServerClient(string.substring(3,string.length()), packet.getAddress(), packet.getPort(), id));
 			System.out.println(string.substring(3, string.length()));
 	     	System.out.println(clients.get(0).address+" "+clients.get(0).port);
+	     	
+	     	String SENDID = "/c/"+id;
+	     	System.out.println("identifier  and its length "+id+" "+SENDID.length());
+
+	     	send(SENDID, packet.getAddress(), packet.getPort());
 
 		}
-		else
+		else if(string.startsWith("/m/")) {
+			sendToAll(string);
 			System.out.println(string);
+		}
 		
+		else if(string.startsWith("/d/")) {
+			String ID = string.split("/d/|/e/")[1];
+			disconnect(Integer.parseInt(ID), true);
+			
+		}
 		
 	}
 	
-	
-	private void send() {
+	private void disconnect(int id, boolean status) {
+		ServerClient client = null;
+		
+		for (int x =0; x<clients.size();x++) {
+			if(clients.get(x).getID() == id)
+			{
+			client = clients.get(x);
+			clients.remove(x);
+			break;
+			}
+		}
+		
+		String message = "";
+		if(status) {
+			message = "client "+ "( "+client.getID()+" ) @ "+client.address.toString()+ ":" +client.port+" disconnected";
+		}
+		else {
+			message = "client "+ "( "+client.getID()+" ) @ "+client.address.toString()+ ":" +client.port+" timeout";
+		}
+		
+		System.out.println(message);
 		
 	}
-		
+	
+
 }

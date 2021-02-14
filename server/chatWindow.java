@@ -17,6 +17,8 @@ import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import javax.swing.JFrame;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -25,7 +27,7 @@ import java.net.UnknownHostException;
 import java.net.DatagramPacket;
 
 
-public class chatWindow extends JFrame {
+public class chatWindow extends JFrame implements Runnable {
 
 JPanel p;	
 private JTextArea area;	
@@ -34,32 +36,33 @@ JButton send;
 JPanel cp1;            //child panel 1;
 JPanel cp2;            //child panel 2;
 GridBagConstraints gbc;
-private String name;
-private String adrs;
-private int port;
 private DefaultCaret caret;
-private DatagramSocket socket;
-private InetAddress ip;
-private Thread sendt;
-private int count = 0;
 
+private boolean running = false;
+Thread run;
+Thread listen ;
+
+Client client;
 
 chatWindow(String name, String adrs, int port){
-this.name = name;	
-this.adrs = adrs;	
-this.port = port;
 
-boolean connect = OpenConnection(adrs);
+client = new Client(name,adrs,port);
+
+boolean connect = client.OpenConnection(adrs);
 if(!connect) {
 	System.err.println("Conection failed");
 	console("connection failed");
 }
-
+ running = true;
+ 
+ run = new Thread(this, "Running");
+ run.start();
+ 
 Showtextwindow();
 console("Attempting connection with "+adrs+" at port: "+port+", User: "+name);
-count++;
+
 String connection = "/c/"+name;
-send(connection.getBytes());
+client.send(connection.getBytes());
 }
 
 public void Showtextwindow() {
@@ -110,7 +113,7 @@ textmessage.addKeyListener(new KeyAdapter() {
 	public void keyPressed(KeyEvent e) {
 		if(e.getKeyCode() == KeyEvent.VK_ENTER)
 		{
-			send(textmessage.getText());
+			send(textmessage.getText(), true);
 			textmessage.setText("");
 		}
 	}
@@ -120,7 +123,7 @@ textmessage.addKeyListener(new KeyAdapter() {
 send = new JButton("send");
 send.addMouseListener(new MouseAdapter() {
 	public void mouseClicked(MouseEvent e) {
-		send(textmessage.getText());
+		send(textmessage.getText(), true);
 		textmessage.setText("");
 	}
 });
@@ -153,71 +156,68 @@ gbc.weighty =0;
 gbc.fill = GridBagConstraints.HORIZONTAL;
 p.add(cp2,gbc);
 
+addWindowListener(new WindowAdapter() {
+	public void windowClosing(WindowEvent e) {
+		String disconnect = "/d/" +client.getID()+"/e/";
+		send(disconnect, false);
+		running = false;                                                 //interesting behavior due to this line;
+		client.close();
+		
+	}
+});
+
+
 setContentPane(p);
 this.setVisible(true);
+this.setTitle("Chat Window");
 this.pack();
 this.validate();
 this.setDefaultCloseOperation(EXIT_ON_CLOSE);
 this.setLocationRelativeTo(null);
 }
 
-public void send(String message) {
+public void run() {
+	listen();
+}
+
+public void send(String message, boolean text) {
+	if(text == true) {
 	if(message.equals("")) return;
 	
-	message = this.name+": "+message;
-	area.append(message+"\n\r");
-	area.setCaretPosition(area.getDocument().getLength());
-	send(message.getBytes());
+	message = client.getName()+": "+message;
+	message = "/m/"+message;
+
+	}
+	client.send(message.getBytes());
 	textmessage.setText("");
+	area.setCaretPosition(area.getDocument().getLength());
+
 }
 
-private boolean OpenConnection(String address) {
-	
-	try {
-		socket = new DatagramSocket();
-		ip = InetAddress.getByName(address);
-	} catch (SocketException e) {
-		e.printStackTrace();
-		return false;
-	} catch (UnknownHostException e) {
-		e.printStackTrace();
-		return false;
-	}
-	return true;
-}
-
-private String receive() {
-	byte[] data = new byte[1024];
-	DatagramPacket packet = new DatagramPacket(data, data.length);
-	
-	try {
-		socket.receive(packet);
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	}
-	String message = new String(packet.getData());
-	return message;
-}
-
-private void send(byte[] data) {
-	sendt = new Thread("send") {
+public void listen() {
+	listen = new Thread("listen") {
 		public void run() {
-			DatagramPacket packet = new DatagramPacket(data, data.length,ip, port);
-			try {
-			socket.send(packet);
-			}
-			catch(IOException e) {
-				e.printStackTrace();
+			while(running) {
+				String message = client.receive();
+				if(message.startsWith("/c/")) {
+					System.out.println(message.length());
+					client.setID(Integer.parseInt(message.split("/c/|/e/")[1]));      // learn regex and string handling;   
+					console("Succesfully connected to server, ID: "+client.getID());
+				}
+				else if(message.startsWith("/m/")) {
+					System.out.println(message.split("/m/|/e/")[1]);
+					console(message.split("/m/|/e/")[1]);
+				}
 			}
 		}
-	};
-	sendt.start();
+	}; listen.start();
 }
 
 
 public void console(String message) {
 	area.append(message+"\n\r");
+	area.setCaretPosition(area.getDocument().getLength());
+
 }
 
 
