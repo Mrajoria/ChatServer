@@ -40,7 +40,7 @@ public class Server implements Runnable {
 		manage = new Thread("manage") {
 			public void run() {
 				while(running) {
-				// Manage;
+				
 			}
 			}
 			

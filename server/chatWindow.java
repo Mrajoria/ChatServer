@@ -205,8 +205,10 @@ public void listen() {
 					console("Succesfully connected to server, ID: "+client.getID());
 				}
 				else if(message.startsWith("/m/")) {
-					System.out.println(message.split("/m/|/e/")[1]);
-					console(message.split("/m/|/e/")[1]);
+					String text = message.substring(3);
+					text = text.split("/e/")[0];
+					console(text);
+					System.out.println(text);
 				}
 			}
 		}
