@@ -13,7 +13,9 @@ public class Server implements Runnable {
 	private DatagramSocket socket;
 	private Thread runServer,manage,recieve,send;
 	private List<ServerClient> clients = new ArrayList<ServerClient>();
+	private List<Integer> clientResponse = new ArrayList<Integer>();
 	private boolean running = false;
+	private final int MAX_ATTEMPTS =5;
 	
 	public Server(int port) {
 		this.port = port;
@@ -40,7 +42,30 @@ public class Server implements Runnable {
 		manage = new Thread("manage") {
 			public void run() {
 				while(running) {
-				
+					sendToAll("/i/server");
+
+					try {
+						Thread.sleep(2000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+						System.out.println("exception");
+					}
+				for(int i=0;i<clients.size();i++) {
+					ServerClient c = clients.get(i);
+					if(!clientResponse.contains(c.getID())){
+						if(c.attempt >=MAX_ATTEMPTS) {
+							disconnect(c.getID(), false);
+						}
+						else {
+							c.attempt++;
+						}
+					}
+					else {
+						Object o = c.getID();
+						clientResponse.remove(o);
+						c.attempt = 0;
+					}
+				}
 			}
 			}
 			
@@ -54,6 +79,7 @@ public class Server implements Runnable {
 			public void run() {
 				while(running) {
 					System.out.println("TOTAL CONNECTED CLIENTS "+clients.size());
+
 					// Recieve data;
 					byte[] data = new byte[1024];
 					DatagramPacket packet = new DatagramPacket(data, data.length);
@@ -126,7 +152,14 @@ public class Server implements Runnable {
 		
 		else if(string.startsWith("/d/")) {
 			String ID = string.split("/d/|/e/")[1];
-			disconnect(Integer.parseInt(ID), true);
+			disconnect(Integer.parseInt(ID),true);
+		}
+		
+		else if(string.startsWith("/i/")) {
+			clientResponse.add(Integer.parseInt(string.split("/i/|/e/")[1]));
+		}
+		
+		else {
 			
 		}
 		
@@ -153,7 +186,8 @@ public class Server implements Runnable {
 		}
 		
 		System.out.println(message);
-		
+		System.out.println("TOTAL CONNECTED CLIENTS "+clients.size());
+
 	}
 	
 

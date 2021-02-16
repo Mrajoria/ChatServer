@@ -38,7 +38,7 @@ JPanel cp2;            //child panel 2;
 GridBagConstraints gbc;
 private DefaultCaret caret;
 
-private boolean running = false;
+private volatile boolean running = false;
 Thread run;
 Thread listen ;
 
@@ -57,8 +57,7 @@ if(!connect) {
  
  run = new Thread(this, "Running");
  run.start();
- 
-Showtextwindow();
+ Showtextwindow();
 console("Attempting connection with "+adrs+" at port: "+port+", User: "+name);
 
 String connection = "/c/"+name;
@@ -73,6 +72,7 @@ try {
 catch(Exception e ) {
 	e.printStackTrace();
 }
+setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
 gbc = new GridBagConstraints ();
 cp1 = new JPanel();
@@ -159,11 +159,11 @@ p.add(cp2,gbc);
 addWindowListener(new WindowAdapter() {
 	public void windowClosing(WindowEvent e) {
 		String disconnect = "/d/" +client.getID()+"/e/";
-		send(disconnect, false);
-		running = false;                                                 //interesting behavior due to this line;
-		client.close();
-		
-	}
+		send(disconnect, false);	
+		running = false;
+	    client.close();
+	    
+		}
 });
 
 
@@ -172,7 +172,6 @@ this.setVisible(true);
 this.setTitle("Chat Window");
 this.pack();
 this.validate();
-this.setDefaultCloseOperation(EXIT_ON_CLOSE);
 this.setLocationRelativeTo(null);
 }
 
@@ -185,11 +184,10 @@ public void send(String message, boolean text) {
 	if(message.equals("")) return;
 	
 	message = client.getName()+": "+message;
-	message = "/m/"+message;
+	message = "/m/"+message+"/e/";
 
 	}
 	client.send(message.getBytes());
-	textmessage.setText("");
 	area.setCaretPosition(area.getDocument().getLength());
 
 }
@@ -198,7 +196,9 @@ public void listen() {
 	listen = new Thread("listen") {
 		public void run() {
 			while(running) {
+				
 				String message = client.receive();
+				
 				if(message.startsWith("/c/")) {
 					System.out.println(message.length());
 					client.setID(Integer.parseInt(message.split("/c/|/e/")[1]));      // learn regex and string handling;   
@@ -210,9 +210,13 @@ public void listen() {
 					console(text);
 					System.out.println(text);
 				}
+				else if (message.startsWith("/i/")) {
+					String text = "/i/"+client.getID()+ "/e/";
+					send(text,false);
+				}
 			}
 		}
-	}; listen.start();
+	}; listen.start(); 
 }
 
 
