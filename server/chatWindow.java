@@ -60,7 +60,7 @@ if(!connect) {
  Showtextwindow();
 console("Attempting connection with "+adrs+" at port: "+port+", User: "+name);
 
-String connection = "/c/"+name;
+String connection = "/c/"+name+"/e/";
 client.send(connection.getBytes());
 }
 
@@ -159,10 +159,12 @@ p.add(cp2,gbc);
 addWindowListener(new WindowAdapter() {
 	public void windowClosing(WindowEvent e) {
 		String disconnect = "/d/" +client.getID()+"/e/";
-		send(disconnect, false);	
+			
 		running = false;
+		if(client.getAuthorizationStatus() == true) return;
+		send(disconnect, false);
 	    client.close();
-	    
+	  
 		}
 });
 
@@ -180,6 +182,7 @@ public void run() {
 }
 
 public void send(String message, boolean text) {
+	if(client.getAuthorizationStatus() == true) return;
 	if(text == true) {
 	if(message.equals("")) return;
 	
@@ -213,6 +216,11 @@ public void listen() {
 				else if (message.startsWith("/i/")) {
 					String text = "/i/"+client.getID()+ "/e/";
 					send(text,false);
+				}
+				else if(message.startsWith("/x/")) {
+					running = false;
+					console("Alert! You are being Kicked off by Serevr!!");
+			
 				}
 			}
 		}

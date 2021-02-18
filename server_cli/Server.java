@@ -6,6 +6,7 @@ import java.net.InetAddress;
 import java.net.DatagramPacket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class Server implements Runnable {
 	
@@ -16,6 +17,7 @@ public class Server implements Runnable {
 	private List<Integer> clientResponse = new ArrayList<Integer>();
 	private boolean running = false;
 	private final int MAX_ATTEMPTS =5;
+	private boolean raw = false;
 	
 	public Server(int port) {
 		this.port = port;
@@ -36,6 +38,67 @@ public class Server implements Runnable {
 	System.out.println("Server listening on port: "+port);
 	manageClients();
 	recieve();
+	Scanner scanner = new Scanner(System.in);
+	while(running) {
+		String text = scanner.nextLine();
+	if(!text.startsWith("/")) {
+		sendToAll("/m/Server: "+text+"/e/");
+		continue;
+	}
+	text = text.substring(1);
+	if(text.equals("raw")) {
+		raw = !raw;
+	}
+	else if(text.contains("clients")) {
+		System.out.println("clietns: ");
+		System.out.println("------------------");
+		for(int x =0;x< clients.size();x++) {
+			ServerClient c = clients.get(x);
+			System.out.println(c.name+" (" +c.getID()+" ):"+c.address.toString()+":"+c.port);
+		}
+		System.out.println("-------------------");
+	}
+	else if(text.startsWith("kick")) {
+		String name =  text.split(" ")[1];
+		int id = -1;
+		boolean number = true;
+		try {
+			id = Integer.parseInt(name);
+		   }
+		catch(NumberFormatException e) {
+			number = false;
+		}
+		if(number) {
+			boolean exists = false;
+			ServerClient c = null;
+			for(int i=0; i<clients.size();i++) {
+				 c = clients.get(i);
+				if(c.getID() == id) {
+					exists = true;
+					break;
+				}
+				
+			}
+			if(exists)  {
+				closeClientRemotely(c.address, c.port);
+				disconnect(id,true);
+			}
+			else System.out.println("Cliend "+id+ " doesnt exist! Check ID numebr");
+			
+		}
+		else {
+			for(int i=0;i<clients.size();i++) {
+				ServerClient c = clients.get(i);
+				if(c.name.equals(name)) {
+					closeClientRemotely(c.address, c.port);
+					disconnect(c.getID(), true);
+					break;
+				}
+			}
+		}
+	}
+	
+	}
 	}
 	
 	private void manageClients() {
@@ -78,8 +141,7 @@ public class Server implements Runnable {
 		recieve = new Thread("recieve") {
 			public void run() {
 				while(running) {
-					System.out.println("TOTAL CONNECTED CLIENTS "+clients.size());
-
+					
 					// Recieve data;
 					byte[] data = new byte[1024];
 					DatagramPacket packet = new DatagramPacket(data, data.length);
@@ -101,11 +163,15 @@ public class Server implements Runnable {
 	}
 	
 	private void sendToAll(String message) {
-		
+		if(message.startsWith("/m/")) {
+			String text = message.substring(3);
+			text = text.split("/e/")[0];
+			System.out.println(message);
+		}
 		for(int i=0;i< clients.size();i++) {
 			ServerClient client = clients.get(i);
 			send(message.getBytes(), client.address, client.port);
-			System.out.println("sending to client "+client.name);
+		//	System.out.println("sending to client "+client.name);
 		}
 	}
 	
@@ -132,16 +198,15 @@ public class Server implements Runnable {
 	
 	private void process(DatagramPacket packet) {
 		String string  = new  String(packet.getData());
+		if(raw) System.out.println(string);
 		if(string.startsWith("/c/")) {
 			int id = UniqueIdentifier.getIdentifier();
-	     	System.out.println("identifier "+id);
-        	clients.add(new ServerClient(string.substring(3,string.length()), packet.getAddress(), packet.getPort(), id));
-			System.out.println(string.substring(3, string.length()));
-	     	System.out.println(clients.get(0).address+" "+clients.get(0).port);
-	     	
+	    // 	System.out.println("identifier "+id);
+			String name = string.split("/c/|/e/")[1];
+        	clients.add(new ServerClient(name, packet.getAddress(), packet.getPort(), id));
+			
 	     	String SENDID = "/c/"+id;
-	     	System.out.println("identifier  and its length "+id+" "+SENDID.length());
-
+	     
 	     	send(SENDID, packet.getAddress(), packet.getPort());
 
 		}
@@ -164,19 +229,38 @@ public class Server implements Runnable {
 		}
 		
 	}
+	//------------------------------------------ //
+	// I will be implementing a sort             //
+	// of experimental function here to remotely // 
+	// close the connection. Well we will just   //
+	// send a /closeRemote/ packet               //
+	// and client's receive thread will process  //
+	// the packet and call socket.close          //
+	//-------------------------------------------//
+	
+//-----------------------------------------------------------begins here-------------//	
+	private void closeClientRemotely(InetAddress a, int port) {
+		
+	String closePacket = "/x/";
+	send(closePacket,a,port);
+		
+	}
+
+//------------------------------------------------------------ends here-------------//
 	
 	private void disconnect(int id, boolean status) {
 		ServerClient client = null;
-		
+		boolean existed = false;
 		for (int x =0; x<clients.size();x++) {
 			if(clients.get(x).getID() == id)
 			{
 			client = clients.get(x);
 			clients.remove(x);
+			existed = true;
 			break;
 			}
 		}
-		
+		if(existed == false) return;
 		String message = "";
 		if(status) {
 			message = "client "+ "( "+client.getID()+" ) @ "+client.address.toString()+ ":" +client.port+" disconnected";

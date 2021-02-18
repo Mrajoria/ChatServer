@@ -13,6 +13,7 @@ private DatagramSocket socket;
 private InetAddress ip;
 private Thread sendt;
 private int ID = -1;
+private boolean socketClosed = false;
 
 private String name;
 private String address;
@@ -47,25 +48,27 @@ public String receive() {
 	
 	try {
 		socket.receive(packet);
-		System.out.println("RECIEVE-now I am using socket "+Thread.currentThread()+" do I hold the lock "+Thread.holdsLock(socket));
 
 	} catch (IOException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
 	}
 	String message = new String(packet.getData());
+	if(message.startsWith("/x/")) {
+		System.err.println("TERMINATION REQUESTED...........Terminated the connection");
+		socketClosed = true;
+		socket.close();
+	}
 	return message;
 }
 
 public void send(byte[] data) {
-	System.out.println("SEND-Now I am using socket "+Thread.currentThread()+" do I hold the lock "+Thread.holdsLock(socket));
 
 	sendt = new Thread("send") {
 		public void run() {
 			DatagramPacket packet = new DatagramPacket(data, data.length,ip, port);
 			try {
 			socket.send(packet);
-			System.out.println(Thread.currentThread()+" " +Thread.holdsLock(socket));
 			
 			}
 			catch(IOException e) {
@@ -113,7 +116,9 @@ public int getID() {
 	return this.ID;
 }
 
-
+public boolean getAuthorizationStatus() {
+	return socketClosed;
+}
 }
 
 
